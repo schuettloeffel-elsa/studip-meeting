@@ -66,6 +66,10 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
                 unset($features['giveAccessToRecordings']);
             }
 
+            if (isset($features['maxParticipants'])) { // keen unwanted params
+                unset($features['maxParticipants']);
+            }
+
             if ($features['guestPolicy'] == 'ALWAYS_DENY') {
                 unset($features['guestPolicy']);
             }
@@ -359,7 +363,7 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
                     240,
                     _('Die maximale Länge (in Minuten) für das Meeting. Nach Ablauf der eingestellen Dauer wird das Meeting automatisch beendet, d.h. der Raum wird geschlossen. Falls bereits vor Ablauf der Zeit alle Teilnehmenden das Meeting verlassen haben, oder ein Moderator das Meeting aktiv beendet wird der Raum ebenfalls geschlossen.'));
 
-        $res['maxParticipants'] = new ConfigOption('maxParticipants', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Maximale Teilnehmerzahl'), 50, self::getFeatureInfo('maxParticipants'));
+        //$res['maxParticipants'] = new ConfigOption('maxParticipants', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Maximale Teilnehmerzahl'), 50, self::getFeatureInfo('maxParticipants'));
 
 
         $res['privateChat'] = new ConfigOption('lockSettingsDisablePrivateChat', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Private Chats deaktivieren'),
