@@ -78,6 +78,10 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
                 unset($features['giveAccessToRecordings']);
             }
 
+            if (isset($features['maxParticipants'])) { // keen unwanted params
+                unset($features['maxParticipants']);
+            }
+
             if (isset($features['guestPolicy-ALWAYS_ACCEPT'])) {
                 if ($features['guestPolicy-ALWAYS_ACCEPT'] == "true") {
                     $features['guestPolicy'] = 'ALWAYS_ACCEPT';
@@ -96,6 +100,7 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
 
             // The logic from BBB seems not to work with ALWAYS_DENY only for guests, in fact, 
             // it denies both guests and participants.
+
             if ($features['guestPolicy'] == 'ALWAYS_DENY') {
                 unset($features['guestPolicy']);
             }
@@ -400,7 +405,7 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
                     240,
                     _('Die maximale Länge (in Minuten) für das Meeting. Nach Ablauf der eingestellen Dauer wird das Meeting automatisch beendet, d.h. der Raum wird geschlossen. Falls bereits vor Ablauf der Zeit alle Teilnehmenden das Meeting verlassen haben, oder ein Moderator das Meeting aktiv beendet wird der Raum ebenfalls geschlossen.'));
 
-        $res['maxParticipants'] = new ConfigOption('maxParticipants', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Maximale Teilnehmerzahl'), 50, self::getFeatureInfo('maxParticipants'));
+        //$res['maxParticipants'] = new ConfigOption('maxParticipants', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Maximale Teilnehmerzahl'), 50, self::getFeatureInfo('maxParticipants'));
 
         $res['guestPolicy-ALWAYS_ACCEPT'] = new ConfigOption('guestPolicy-ALWAYS_ACCEPT', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Zugang via Link'), false,
                  _('Legen Sie fest, ob Benutzer mit Einladungslink als Gäste an der Besprechung teilnehmen dürfen.'));
