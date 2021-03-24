@@ -9,7 +9,7 @@ use Meetings\MeetingsTrait;
 use Meetings\MeetingsController;
 use Meetings\Errors\Error;
 use Exception;
-use Meetings\Models\I18N as _;
+use Meetings\Models\I18N;
 
 use ElanEv\Model\MeetingCourse;
 use ElanEv\Model\Meeting;
@@ -64,6 +64,7 @@ class RoomInfo extends MeetingsController
 
                     $room_infos[$meetingCourse->meeting->id] = $info;
                 } catch (Exception $e) {
+                    throw new Error($e->getMessage(), ($e->getCode() ? $e->getCode() : 404));
                 }
             }
         }

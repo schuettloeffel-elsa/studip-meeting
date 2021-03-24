@@ -1,48 +1,41 @@
 <template>
-    <div v-if="this.visible" class="cw-dialog">
-        <transition name="modal-fade">
-            <div class="modal-backdrop">
-                <div class="modal" role="dialog">
-                    <header class="modal-header">
-                        <slot name="header">
-                            {{ 'Serverkonfiguration' | i18n }}
-                            <span class="modal-close-button" @click="close"></span>
-                        </slot>
-                    </header>
+    <div v-if="visible">
+        <MeetingDialog :title="$gettext('Serverkonfiguration')" @close="close">
+            <template v-slot:content>
+                <MessageBox v-if="dialog_message.text" :type="dialog_message.type" @hide="dialog_message.text = ''">
+                    {{ dialog_message.text }}
+                </MessageBox>
 
-                    <section class="modal-body">
-                        <MessageBox v-if="dialog_message.text" :type="dialog_message.type" @hide="dialog_message.text = ''">
-                            {{ dialog_message.text }}
-                        </MessageBox>
-                        <div v-for="(value, key) in driver.config" :key="key">
-                            <label v-if="value.name != 'enable' && value.name != 'roomsize-presets'" class="large">
-                                {{ value.display_name | i18n }}
-                                <input class="size-l" :type="(value.name == 'maxParticipants') ? 'number' : 'text'" min="0" @change="(value.name == 'maxParticipants') ? reduceMins() : ''"
-                                    v-model="server[driver_name][value.name]"
-                                    :placeholder="value.value"> 
-                            </label>
-                            <ServerRoomSize v-else-if="value.name == 'roomsize-presets'" :roomsize_object="value" :this_server="server[driver_name]"/>
-                        </div>
-                    </section>
+                <form class="default" style="position: relative" @submit="edit">
+                    <div v-for="(value, key) in driver.config" :key="key">
+                        <label v-if="value.name != 'enable' && value.name != 'roomsize-presets'" class="large">
+                            {{ value.display_name }}
+                            <input class="size-l" :type="(value.name == 'maxParticipants') ? 'number' : 'text'" min="0" @change="(value.name == 'maxParticipants') ? reduceMins() : ''"
+                                v-model="server[driver_name][value.name]"
+                                :placeholder="value.value">
+                        </label>
+                        <ServerRoomSize v-else-if="value.name == 'roomsize-presets'" :roomsize_object="value" :this_server="server[driver_name]"/>
+                    </div>
+                </form>
+            </template>
 
-                    <footer class="modal-footer">
-                        <slot name="footer">
-                            <StudipButton
-                                icon="accept"
-                                @click="edit">
-                                {{ 'Übernehmen' | i18n }}
-                            </StudipButton>
 
-                            <StudipButton
-                                icon="cancel"
-                                @click="close">
-                                {{ "Abbrechen" | i18n }}
-                            </StudipButton>
-                        </slot>
-                    </footer>
-                </div>
-            </div>
-        </transition>
+            <template v-slot:buttons>
+                <StudipButton
+                    icon="accept" @click="edit"
+                    v-translate
+                >
+                    Übernehmen
+                </StudipButton>
+
+                <StudipButton
+                    icon="cancel" @click="close"
+                    v-translate
+                >
+                    Abbrechen
+                </StudipButton>
+            </template>
+        </MeetingDialog>
     </div>
 </template>
 <script>
@@ -51,6 +44,7 @@ import StudipButton from "@/components/StudipButton";
 import ServerRoomSize from "@/components/ServerRoomSize";
 import MessageBox from "@/components/MessageBox";
 
+import { dialog } from '@/common/dialog.mixins'
 
 export default {
     name: 'ServerDialog',
@@ -61,6 +55,8 @@ export default {
         driver_name: String,
         driver: Object
     },
+
+    mixins: [dialog],
 
     components: {
         StudipButton,
@@ -80,10 +76,13 @@ export default {
 
     methods: {
         close() {
+            this.dialogClose();
             this.$emit('close');
         },
+
         edit() {
             if (this.validateForm()) {
+                this.dialogClose();
                 this.$emit('edit', {
                     driver_name: this.driver_name,
                     server     : this.server
@@ -95,6 +94,7 @@ export default {
                 }
             }
         },
+
         validateForm() {
             var isValid = true;
             if (!this.validateRoomSizeNumberInputs()) {
@@ -102,6 +102,7 @@ export default {
             }
             return isValid;
         },
+
         validateRoomSizeNumberInputs() {
             var cmp = this.$children.find(child => { return child.$options.name === "ServerRoomSize"; });
             let validity = true;
@@ -120,7 +121,7 @@ export default {
             return validity;
         },
         reduceMins() {
-            if (this.server[this.driver_name]['maxParticipants'] && 
+            if (this.server[this.driver_name]['maxParticipants'] &&
                  parseInt(this.server[this.driver_name]['maxParticipants']) > 0 &&
                  this.server[this.driver_name]['roomsize-presets']) {
                 if (parseInt(this.server[this.driver_name]['maxParticipants']) > 0 && parseInt(this.server[this.driver_name]['maxParticipants']) < 3) {

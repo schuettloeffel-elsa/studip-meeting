@@ -9,7 +9,7 @@ use Meetings\MeetingsTrait;
 use Meetings\MeetingsController;
 use Meetings\Errors\Error;
 use Exception;
-use Meetings\Models\I18N as _;
+use Meetings\Models\I18N;
 
 use ElanEv\Model\MeetingCourse;
 use ElanEv\Model\Meeting;
@@ -41,7 +41,7 @@ class RoomDelete extends MeetingsController
             $driver_factory = new DriverFactory(Driver::getConfig());
             $room_id = $args['room_id'];
             $message = [
-                'text' => _('Dieser Raum konnte nicht gefunden werden'),
+                'text' => I18N::_('Dieser Raum konnte nicht gefunden werden'),
                 'type' => 'error'
             ];
 
@@ -62,12 +62,12 @@ class RoomDelete extends MeetingsController
                     try {
                         $driver->deleteMeeting($meeting->getMeetingParameters());
                     } catch (Exception $e) {
-                        throw new Error($e->getMessage(), 404);
+                        throw new Error($e->getMessage(), ($e->getCode() ? $e->getCode() : 404));
                     }
 
                     $meeting->delete();
                     $message = [
-                        'text' => _('Meeting wurde gelöscht.'),
+                        'text' => I18N::_('Meeting wurde gelöscht.'),
                         'type' => 'success'
                     ];
                 }
@@ -77,7 +77,7 @@ class RoomDelete extends MeetingsController
             ], $response);
 
         } catch (Exception $e) {
-            throw new Error($e->getMessage(), 404);
+            throw new Error($e->getMessage(), ($e->getCode() ? $e->getCode() : 404));
         }
     }
 }

@@ -8,31 +8,37 @@
             {{ message.text }}
         </MessageBox>
 
-        <MessageBox v-if="Object.keys(config).length === 0" type="error">
-            {{ "Es ist bisher kein Meetingsserver konfiguriert. Bitte wenden Sie sich an eine/n Systemadministrator/in!" | i18n }}
+        <MessageBox v-if="config && Object.keys(config).length === 0" type="error">
+            <translate>
+                Es ist bisher kein Meetingsserver konfiguriert. Bitte wenden
+                Sie sich an eine/n Systemadministrator/in!
+            </translate>
         </MessageBox>
 
         <span v-else>
-            <MessageBox v-if="rooms_checked && !rooms_list.length && config && course_config.display.addRoom" :type="'info'">
-                {{ "Bisher existieren keine Meeting-Räume für diese Veranstaltung. Möchten Sie einen anlegen?" | i18n }}
+            <MessageBox v-if="rooms_checked && !rooms_list.length && config && course_config.display.addRoom" type="info">
+                <translate>
+                    Bisher existieren keine Meeting-Räume für diese Veranstaltung.
+                    Möchten Sie einen anlegen?
+                </translate>
                 <br>
                 <StudipButton type="button"  @click="createNewRoom">
-                    {{ "Neuer Raum" | i18n}}
+                    <translate>Neuer Raum</translate>
                 </StudipButton>
             </MessageBox>
 
             <MessageBox v-if="!rooms_checked" type="warning">
-                {{ "Raumliste wird geladen..." | i18n }}
+                <translate>Raumliste wird geladen...</translate>
             </MessageBox>
 
             <p>
                 <StudipButton type="button" icon="add" v-if="rooms_list.length && config && course_config.display.addRoom"
                     @click="createNewRoom">
-                    {{ 'Raum hinzufügen' | i18n }}
+                    <translate>Raum hinzufügen</translate>
                 </StudipButton>
 
                 <label v-if="rooms_list.length">
-                    <input type="text" :placeholder="`Räume filtern nach Name` | i18n" v-model="searchtext">
+                    <input type="text" :placeholder="$gettext('Räume filtern nach Name')" v-model="searchtext">
                 </label>
             </p>
 
@@ -162,6 +168,10 @@ export default {
                         : true)
                     );
                 }
+
+                if (Object.keys(room).includes('group_id') && room.group_id == null) {
+                    room.group_id = '';
+                }
             }
 
             this.createEditRoom = room;
@@ -200,7 +210,6 @@ export default {
 
         feedbackDone(params) {
             this.showFeedback = false;
-
             if (params != undefined && params.message != undefined) {
                 this.showMessage(params.message);
             }

@@ -3,6 +3,7 @@
 node_modules
 static
 .vscode
+.DS_Store
 app/views/index/index.php
 app/views/admin/index.php
-.DS_Store
+app/views/room/lobby.php
