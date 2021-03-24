@@ -10,7 +10,7 @@ use Meetings\MeetingsController;
 use ElanEv\Model\Driver;
 use Meetings\Errors\Error;
 use Exception;
-use Meetings\Models\I18N as _;
+use Meetings\Models\I18N;
 use ElanEv\Model\MeetingCourse;
 
 class ConfigAdd extends MeetingsController
@@ -36,21 +36,42 @@ class ConfigAdd extends MeetingsController
                         }
                     }
                 }
+
+                // Remove folder_id from meetings when the preupload is off
+                if (isset($config_options['preupload']) && !filter_var($config_options['preupload'], FILTER_VALIDATE_BOOLEAN)) {
+                    $courseMeetings = MeetingCourse::findAll();
+                    foreach ($courseMeetings as $courseMeeting) {
+                        if ($courseMeeting->meeting->driver == $driver_name && $courseMeeting->meeting->folder_id) {
+                            $courseMeeting->meeting->folder_id = null;
+                            $courseMeeting->meeting->store();
+                        }
+                    }
+                }
+
                 $valid_servers = Driver::setConfigByDriver($driver_name, $config_options);
 
                 if (!$valid_servers) {
-                    $res_message_text[] = sprintf(_('Die Überprüfung der Servereinstellungen '
+                    $res_message_text[] = sprintf(I18N::_('Die Überprüfung der Servereinstellungen '
                         . 'für %s war nicht erfolgreich, wurden aber trotzdem gespeichert.'), $driver_name);
                 }
             }
 
+            if (isset($json['general_config']) && !empty($json['general_config'])) {
+                if (isset($json['general_config']['feedback_contact_address']) && !empty($json['general_config']['feedback_contact_address'])
+                    && !filter_var($json['general_config']['feedback_contact_address'], FILTER_VALIDATE_EMAIL)) {
+                    $res_message_text[] = I18N::_('Die Adresse des Feedback-Supports muss eine gültige E-Mail-Adresse sein');
+                    $json['general_config']['feedback_contact_address'] = '';
+                }
+                Driver::setGeneralConfig($json['general_config']);
+            }
+
             $message = [
-                'text' => ((!empty($res_message_text)) ? $res_message_text : _('Konfiguration gespeichert.')),
+                'text' => ((!empty($res_message_text)) ? $res_message_text : I18N::_('Konfiguration gespeichert.')),
                 'type' => ((!empty($res_message_text)) ? 'error' : 'success')
             ];
         } catch ( Exception $e) {
             $message = [
-                'text' => _('Konnte Konfiguration nicht speichern!'),
+                'text' => I18N::_('Konnte Konfiguration nicht speichern!'),
                 'type' => 'error'
             ];
         }

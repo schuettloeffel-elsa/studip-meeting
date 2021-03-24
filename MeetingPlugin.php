@@ -52,6 +52,7 @@ class MeetingPlugin extends StudIPPlugin implements StandardPlugin, SystemPlugin
             }
         }
 
+
         // do nothing if plugin is deactivated in this seminar/institute
         if (!$this->isActivated()) {
             return;
@@ -215,7 +216,7 @@ class MeetingPlugin extends StudIPPlugin implements StandardPlugin, SystemPlugin
     /**
      * {@inheritdoc}
      */
-    function perform($unconsumed_path)
+    public function perform($unconsumed_path)
     {
         require_once __DIR__ . '/vendor/autoload.php';
 
@@ -248,9 +249,9 @@ class MeetingPlugin extends StudIPPlugin implements StandardPlugin, SystemPlugin
      * returns the series id of the course if opencast has been set for the course
      *
      * @param  string  $cid course ID with default null
-     * @return bool | array | string
+     * @return bool | array | string(empty - in case opencast is not activated for this course)
     */
-    function checkOpenCast($cid = null) {
+    public static function checkOpenCast($cid = null) {
         $opencast_plugin = PluginEngine::getPlugin("OpenCast");
         if ($opencast_plugin) {
             if ($cid) {
@@ -266,11 +267,61 @@ class MeetingPlugin extends StudIPPlugin implements StandardPlugin, SystemPlugin
                         return false;
                     }
                 } else {
-                    return "not active";
+                    return ""; //because of checkers along the flow (empty string is a sign of Opencast not activated!)
                 }
             }
             return true;
         }
         return false;
+    }
+
+    /**
+     * @inherits
+     *
+     * Overwrite default metadata-function to translate the descriptions
+     *
+     * @return Array the plugins metadata as an array
+     */
+    public function getMetadata()
+    {
+        $metadata = parent::getMetadata();
+
+        $metadata['pluginname']  = $this->_("Meetings");
+        $metadata['displayname'] = $this->_("Meetings");
+
+        $metadata['descriptionlong'] = $this->_("Virtueller Raum, mit dem Live-Online-Treffen, Veranstaltungen "
+            . "und Videokonferenzen durchgeführt werden können. Die Teilnehmenden können sich während "
+            . "eines Meetings gegenseitig hören und über eine angeschlossene Webcam - wenn vorhanden - "
+            . "sehen und miteinander arbeiten. Folien können präsentiert und Abfragen durchgeführt werden. "
+            . "Ein Fenster in der Benutzungsoberfläche des eigenen Rechners kann für andere sichtbar "
+            . "geschaltet werden, um zum Beispiel den Teilnehmenden bestimmte Webseiten oder Anwendungen "
+            . "zu zeigen. Außerdem kann die Veranstaltung aufgezeichnet und Interessierten zur Verfügung gestellt werden."
+        );
+
+        $metadata['descriptionshort'] = $this->_("Face-to-face-Kommunikation mit Adobe Connect oder BigBlueButton");
+
+        $metadata['keywords'] = $this->_("Videokonferenz- und Veranstaltungsmöglichkeit; "
+            . "Live im Netz präsentieren sowie gemeinsam zeichnen und arbeiten;Kommunikation über Mikrofon und Kamera; "
+            . "Ideal für dezentrale Lern- und Arbeitsgruppen; "
+            . "Verlinkung zu bereits bestehenden eigenen Räumen"
+        );
+
+        return $metadata;
+    }
+
+    /**
+     * getMeetingManifestInfo
+     * 
+     * get the plugin manifest from PluginManager getPluginManifest method
+     * 
+     * @return Array $metadata the manifest metadata of this plugin
+     */
+    public static function getMeetingManifestInfo() 
+    {
+        $plugin_manager = \PluginManager::getInstance();
+        $this_plugin = $plugin_manager->getPluginInfo(__CLASS__);
+        $plugin_path = \get_config('PLUGINS_PATH') . '/' .$this_plugin['path'];
+        $manifest = $plugin_manager->getPluginManifest($plugin_path);
+        return $manifest;
     }
 }

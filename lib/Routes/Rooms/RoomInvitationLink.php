@@ -8,37 +8,34 @@ use Meetings\Errors\AuthorizationFailedException;
 use Meetings\MeetingsTrait;
 use Meetings\MeetingsController;
 use Meetings\Errors\Error;
-use Exception;
-use Meetings\Models\I18N;
+use ElanEv\Model\InvitationsLink;
 
-use ElanEv\Model\MeetingCourse;
-use ElanEv\Model\Meeting;
 
-class RoomShow extends MeetingsController
+class RoomInvitationLink extends MeetingsController
 {
     use MeetingsTrait;
     /**
      * Returns the parameters of a selected room
      *
      * @param string $room_id room id
+     * @param string $cid course id
      *
      *
-     * @return json room parameter
+     * @return json redirect parameter
      *
-     * @throws \Error if no parameters can be found
+     * @throws \Error if there is any problem
      */
     public function __invoke(Request $request, Response $response, $args)
     {
         $room_id = $args['room_id'];
+        $cid = $args['cid'];
 
-        $room_raw = Meeting::find($room_id);
-
-        $parameters = $room_raw->getMeetingParameters()->toArray();
-
-        if ($parameters) {
-            return $this->createResponse(['parameters' => $parameters], $response);
+        if (!$GLOBALS['perm']->have_studip_perm('tutor', $cid)) {
+            throw new Error(_('Access Denied'), 403);
         }
 
-        throw new Error('Room Parameters not found', 404);
+        $invitations_link = InvitationsLink::findOneBySQL('meeting_id = ?', [$room_id]);
+
+        return $this->createResponse(['hex' => $invitations_link->hex, 'default_name' => $invitations_link->default_name], $response);
     }
 }

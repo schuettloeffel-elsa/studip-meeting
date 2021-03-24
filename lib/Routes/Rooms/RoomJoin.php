@@ -9,7 +9,7 @@ use Meetings\MeetingsTrait;
 use Meetings\MeetingsController;
 use Meetings\Errors\Error;
 use Exception;
-use Meetings\Models\I18N as _;
+use Meetings\Models\I18N;
 
 use ElanEv\Model\MeetingCourse;
 use ElanEv\Model\Meeting;
@@ -18,6 +18,7 @@ use ElanEv\Model\Join;
 use ElanEv\Model\Helper;
 use ElanEv\Driver\DriverFactory;
 use ElanEv\Model\Driver;
+use MeetingPlugin;
 
 class RoomJoin extends MeetingsController
 {
@@ -45,8 +46,9 @@ class RoomJoin extends MeetingsController
         }
 
         $meeting = Meeting::find($room_id);
+
         if (!($meeting && $meeting->courses->find($cid))) {
-            throw new Error(_('Dieser Raum in diesem Kurs kann nicht gefunden werden!'), 404);
+            throw new Error(I18N::_('Dieser Raum in diesem Kurs kann nicht gefunden werden!'), 404);
         }
 
         //putting mandatory logoutURL into features
@@ -55,12 +57,46 @@ class RoomJoin extends MeetingsController
                 $hostUrl = $request->getUri()->getScheme() . '://' . $request->getUri()->getHost()
                     .($request->getUri()->getPort() ? ':' . $request->getUri()->getPort() : '');
                 $features['logoutURL'] =  $hostUrl . \PluginEngine::getLink('meetingplugin', array('cid' => $cid), 'index');
-                $meeting->features = json_encode($features);
-                $meeting->store();
             }
+
+            //update/removing opencast series id if the OpenCast is not activated in the course or it has been changed unnoticed!
+            if (isset($features['meta_opencast-dc-isPartOf']) && !empty($features['meta_opencast-dc-isPartOf'])) {
+                if (isset($features['record']) && $features['record'] == true
+                    && Driver::getConfigValueByDriver($meeting->driver, 'opencast') == 1) {
+                    $current_series_id = MeetingPlugin::checkOpenCast($cid);
+                    if (empty($current_series_id)) { // Opencast is not activated for this course
+                        unset($features['meta_opencast-dc-isPartOf']);
+                    } else if ($current_series_id != $features['meta_opencast-dc-isPartOf']) {
+                        $features['meta_opencast-dc-isPartOf'] = $current_series_id;
+                    }
+                } else {
+                    unset($features['meta_opencast-dc-isPartOf']);
+                }
+            }
+            $meeting->features = json_encode($features);
+            $meeting->store();
         }
 
         $driver = $driver_factory->getDriver($meeting->driver, $meeting->server_index);
+
+        if (isset($features['room_anyone_can_start'])
+            && $features['room_anyone_can_start'] === 'false'
+            && !$perm->have_studip_perm('tutor', $cid)
+        ) {
+            $meetingCourse = new MeetingCourse([$room_id, $cid ]);
+            $status = $driver->isMeetingRunning($meetingCourse->meeting->getMeetingParameters()) === 'true' ? true : false;
+
+            if (!$status) {
+                header('Location:' .
+                    \URLHelper::getURL(
+                        'plugins.php/meetingplugin/room/lobby/' . $room_id . '/' . $cid . '/#lobby',
+                        ['cancel_login' => 1]
+                    )
+                );
+                exit;
+            }
+        }
+
 
         $joinParameters = new JoinParameters();
         $joinParameters->setMeetingId($room_id);
@@ -94,10 +130,11 @@ class RoomJoin extends MeetingsController
                 header('Location: ' . $join_url);
                 exit;
             } else {
-                $error_message = _('Konnte dem Meeting nicht beitreten, Kommunikation mit dem Meeting-Server fehlgeschlagen.');
+                $error_message = I18N::_('Konnte dem Meeting nicht beitreten, Kommunikation mit dem Meeting-Server fehlgeschlagen.');
             }
         } catch (Exception $e) {
-            $error_message = _('Konnte dem Meeting nicht beitreten, Kommunikation mit dem Meeting-Server fehlgeschlagen. ('. $e->getMessage() .')');
+            $error_message = I18N::_('Konnte dem Meeting nicht beitreten, Kommunikation mit dem Meeting-Server fehlgeschlagen. ('. $e->getMessage() .')');
+            throw new Error($error_message, ($e->getCode() ? $e->getCode() : 404));
         }
 
         throw new Error($error_message, 404);

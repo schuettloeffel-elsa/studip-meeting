@@ -10,7 +10,7 @@ use Meetings\MeetingsController;
 use Meetings\Errors\Error;
 use Meetings\Errors\DriverError;
 use Exception;
-use Meetings\Models\I18N as _;
+use Meetings\Models\I18N;
 
 use ElanEv\Model\MeetingCourse;
 use ElanEv\Model\Meeting;
@@ -81,7 +81,7 @@ class RoomsList extends MeetingsController
                             ), FILTER_VALIDATE_BOOLEAN))
                     ) {
                         if ((count($driver->getRecordings($meetingCourse->meeting->getMeetingParameters())) > 0)
-                            || ($this->getFeatures($meeting['features'], 'meta_opencast-dc-isPartOf') &&
+                            || ($this->getFeatures($meeting['features'], 'meta_opencast-dc-isPartOf') && !empty(MeetingPlugin::checkOpenCast($meetingCourse->course_id)) &&
                             $this->getFeatures($meeting['features'], 'meta_opencast-dc-isPartOf') == MeetingPlugin::checkOpenCast($meetingCourse->course_id)))
                         {
                             $meeting['has_recordings'] = true;
@@ -90,6 +90,7 @@ class RoomsList extends MeetingsController
                 }
 
                 $creator = \User::find($meetingCourse->meeting->user_id);
+                $meeting['name']= ltrim($meetingCourse->meeting->name);
 
                 $meeting['details'] = [
                     'creator' => $create ? $creator->getFullname() : 'unbekannt',
@@ -99,14 +100,31 @@ class RoomsList extends MeetingsController
                 $meeting['features'] = $this->getFeatures($meeting['features']);
                 $meeting['enabled'] = $meetingEnabled;
 
+                if ($meeting['folder_id']) {
+                    $meeting['details']['folder'] = [
+                        'name' => $meetingCourse->meeting->folder->name,
+                        'link' => \URLHelper::getURL('dispatch.php/course/files/index/' . $meeting['folder_id'], [
+                            'cid' => $cid
+                        ])
+                    ];
+                }
+
                 $course_rooms_list[] = $meeting;
             } catch (Exception $e) {
-                $errors[] = $e->getMessage();
+                $errorCode = 500;
+                if ($e->getCode()) {
+                    $errorCode = $e->getCode();
+                }
+                if (!in_array($e->getMessage(), $errors[$errorCode])) {
+                    $errors[$errorCode][] = $e->getMessage();
+                }
             }
         }
 
         if (!empty($errors)) {
-            throw new Error(implode ("\n", $errors), 500);
+            foreach ($errors as $error_code => $error_messages) {
+                throw new Error(implode ("\n", $error_messages), $error_code);
+            }
         } else {
             return $this->createResponse($course_rooms_list, $response);
         }

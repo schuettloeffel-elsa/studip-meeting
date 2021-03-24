@@ -9,7 +9,7 @@ use Meetings\MeetingsTrait;
 use Meetings\MeetingsController;
 use Meetings\Errors\Error;
 use Exception;
-use Meetings\Models\I18N as _;
+use Meetings\Models\I18N;
 
 use ElanEv\Model\MeetingCourse;
 use ElanEv\Model\Meeting;
@@ -46,7 +46,7 @@ class RoomRunning extends MeetingsController
                 return $this->createResponse(['status' => $status], $response);
             }
         } catch (Exception $e) {
-            throw new Error($e->getMessage(), 404);
+            throw new Error($error_message, ($e->getCode() ? $e->getCode() : 404));
         }
     }
 }
