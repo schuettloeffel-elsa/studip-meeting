@@ -31,6 +31,7 @@ class Driver
             $title = '';
             $config_options = [];
             $recording_options = [];
+            $preupload_option = [];
             if (in_array('ElanEv\Driver\DriverInterface', class_implements($class)) !== false) {
                 $title          = substr(basename($filename), 0, -4);
                 $config_options = $class::getConfigOptions();
@@ -45,13 +46,19 @@ class Driver
                 }
             }
 
+            if (in_array('ElanEv\Driver\FolderManagementInterface', class_implements($class)) !== false) {
+                $preupload_option['preupload'] = new \ElanEv\Driver\ConfigOption('preupload', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Automatisches Hochladen von Folien zulassen'), true); // Translation: Allow automatic upload of slides;
+            }
+
             if ($title && $config_options) {
                 $drivers[$title] = array(
-                    'title'     => $title,
+                    'title'        => $title,
+                    'display_name' => $title,
                     'config'    => $toArray ? self::convertDriverConfigToArray($config_options) : $config_options,
                 );
 
                 !$recording_options ?:  $drivers[$title]['recording'] = $toArray ? self::convertDriverConfigToArray($recording_options) : $recording_options;
+                !$preupload_option ?:  $drivers[$title]['preupload'] = $toArray ? self::convertDriverConfigToArray($preupload_option) : $preupload_option;
             }
         }
 
@@ -64,8 +71,41 @@ class Driver
             self::$config = json_decode(\Config::get()->getValue('VC_CONFIG'), true);
         }
 
+        $drivers = Driver::discover(true);
+
+        // remove non existent drivers from config
+        foreach (self::$config as $driver_name => $data) {
+            if (!$drivers[$driver_name]) {
+                unset (self::$config[$driver_name]);
+            }
+        }
+
+        // add newly found drivers
+        foreach ($drivers as $driver_name => $data) {
+            if (!self::$config[$driver_name]) {
+                self::$config[$driver_name] = [];
+            }
+        }
+
+        if (empty(self::$config)) {
+            return;
+        }
+
         foreach (self::$config as $driver_name => $config) {
             $class = 'ElanEv\\Driver\\' . $driver_name;
+
+            if (!isset(self::$config[$driver_name]['title'])) {
+                self::$config[$driver_name]['title'] = $driver_name;
+            }
+
+            if (!isset(self::$config[$driver_name]['config'])) {
+                self::$config[$driver_name]['config'] = $class::getConfigOptions();
+            }
+
+            if (!isset(self::$config[$driver_name]['display_name'])) {
+                self::$config[$driver_name]['display_name'] = $driver_name;
+            }
+
             if (in_array('ElanEv\Driver\DriverInterface', class_implements($class)) !== false) {
                 if ($create_features = $class::getCreateFeatures()) {
                     self::$config[$driver_name]['features']['create'] = self::convertDriverConfigToArray($create_features);
@@ -74,9 +114,9 @@ class Driver
             if (in_array('ElanEv\Driver\RecordingInterface', class_implements($class)) !== false) {
                 self::$config[$driver_name]['features']['record'] = self::convertDriverConfigToArray($class::getRecordFeature());
             }
-            if (in_array('ElanEv\Driver\FolderManagementInterface', class_implements($class)) !== false) {
+            /* if (in_array('ElanEv\Driver\FolderManagementInterface', class_implements($class)) !== false) {
                 self::$config[$driver_name]['features']['folders'] = true;
-            }
+            } */
         }
     }
 
@@ -160,6 +200,22 @@ class Driver
         self::loadConfig();
 
         return self::$config;
+    }
+
+    static function getGeneralConfig() {
+        return json_decode(\Config::get()->getValue('VC_GENERAL_CONFIG'), true);
+    }
+
+    static function setGeneralConfig($general_configs) {
+        \Config::get()->store('VC_GENERAL_CONFIG', json_encode($general_configs));
+    }
+
+    static function getGeneralConfigValue($key) {
+        $general_config = json_decode(\Config::get()->getValue('VC_GENERAL_CONFIG'), true);
+        if (isset($general_config[$key])) {
+            return $general_config[$key];
+        }
+        return false;
     }
 
     static function getConfigValueByDriver($driver_name, $key)

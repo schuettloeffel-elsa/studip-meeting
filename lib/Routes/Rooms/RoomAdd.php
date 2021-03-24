@@ -77,6 +77,25 @@ class RoomAdd extends MeetingsController
                 $error_text = I18N::_('Server ist nicht definiert');
             }
 
+            // Apply validation on features inputs
+            try {
+                $validated_features = $this->validateFeatureInputs($json['features'], $json['driver']);
+                if (!$validated_features) {
+                    $message = [
+                        'text' => I18N::_('Raumeinstellung kann nicht bearbeitet werden!'),
+                        'type' => 'error'
+                    ];
+                    return $this->createResponse([
+                        'message'=> $message,
+                    ], $response);
+                    die();
+                } else {
+                    $json['features'] = $validated_features;
+                }
+            } catch (Exception $e) {
+                throw new Error($e->getMessage(), 404);
+            }
+
             $servers = Driver::getConfigValueByDriver($json['driver'], 'servers');
             $server_maxParticipants = $servers[$json['server_index']]['maxParticipants'];
             if (is_numeric($server_maxParticipants) && $server_maxParticipants > 0 && $json['features']['maxParticipants'] > $server_maxParticipants) {
@@ -105,8 +124,10 @@ class RoomAdd extends MeetingsController
                             $series_id = MeetingPlugin::checkOpenCast($json['cid']);
                             if ($series_id) {
                                 $opencast_series_id = $series_id;
-                            } else {
+                            } else if ($series_id === false) {
                                 throw new Error(I18N::_('Opencast Series id kann nicht gefunden werden!'), 404);
+                            } else if ($series_id === '') {
+                                //TODO: handel if the opencast is not activated!
                             }
                         }
                     }
@@ -145,7 +166,7 @@ class RoomAdd extends MeetingsController
                     }
                 } catch (Exception $e) {
                     self::revert_on_fail($meeting, $json['cid']);
-                    throw new Error($e->getMessage(), 404);
+                    throw new Error($e->getMessage(), ($e->getCode() ? $e->getCode() : 404));
                 }
 
                 $meeting->remote_id = $meetingParameters->getRemoteId();
@@ -163,7 +184,7 @@ class RoomAdd extends MeetingsController
             }
 
         } catch (Exception $e) {
-            throw new Error($e->getMessage(), 404);
+            throw new Error($e->getMessage(), ($e->getCode() ? $e->getCode() : 404));
         }
 
         return $this->createResponse([

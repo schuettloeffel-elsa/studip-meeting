@@ -2,14 +2,7 @@
     <div>
         <h1 v-translate>Meetings konfigurieren</h1>
 
-        <MessageBox v-if="message" :type="message.type" @hide="message = ''">
-            <span v-if="typeof message.text == 'string'">{{ message.text }}</span>
-            <ul v-else>
-                <li v-for="(text, i) in message.text" :key="i">
-                    {{ text }}
-                </li>
-            </ul>
-        </MessageBox>
+        <MessageList :messages="message ? [message] : []" />
 
         <MessageBox v-if="changes_made" type="warning">
             <translate>
@@ -18,6 +11,15 @@
         </MessageBox>
 
         <form class="default" v-if="drivers" @submit.prevent>
+            <fieldset>
+                <legend v-translate>
+                    Allgemeine Konfiguration
+                </legend>
+                <label>
+                    <translate>Feedback Support-Adresse</translate>
+                    <input type="text" v-model.trim="general_config['feedback_contact_address']">
+                </label>
+            </fieldset>
             <fieldset v-for="(driver, driver_name) in drivers" :key="driver_name">
                 <legend>
                     {{ driver.title }}
@@ -54,7 +56,27 @@
                     </label>
                 </div>
 
-                <div v-if="config[driver_name].servers && Object.keys(config[driver_name].servers).length">
+                <div v-if="Object.keys(driver).includes('preupload')">
+                    <label v-for="(rval, rkey) in driver['preupload']" :key="rkey">
+                        <input v-if="typeof rval['value'] == 'boolean'" type="checkbox"
+                        true-value="1"
+                        false-value="0"
+                        v-model="config[driver_name][rval['name']]">
+                        <span :class="{'disabled': rval['name'] != 'preupload' && config[driver_name]['preupload'] != '1'}">
+                            {{ rval['display_name'] }}
+                        </span>
+
+                        <StudipTooltipIcon v-if="Object.keys(rval).includes('info')" :text="rval['info']">
+                        </StudipTooltipIcon>
+                    </label>
+                </div>
+
+                <label v-if="Object.keys(config[driver_name]).includes('welcome')">
+                    <translate>Willkommensnachricht</translate>
+                    <textarea v-model="config[driver_name]['welcome']" cols="30" rows="5"></textarea>
+                </label>
+
+                <div v-if="config[driver_name].servers && Object.keys(config[driver_name].servers).length && server_object[driver_name]">
                     <h3 v-translate>
                         Folgende Server werden verwendet
                     </h3>
@@ -117,6 +139,9 @@
                 />
 
             </fieldset>
+
+            <MessageList :messages="message ? [message] : []" />
+
             <footer>
                 <StudipButton icon="accept"
                     :class="{
@@ -139,6 +164,7 @@ import StudipButton from "@/components/StudipButton";
 import StudipTooltipIcon from "@/components/StudipTooltipIcon";
 import StudipIcon from "@/components/StudipIcon";
 import MessageBox from "@/components/MessageBox";
+import MessageList from "@/components/MessageList";
 import ServerDialog from "@/components/ServerDialog";
 
 import {
@@ -157,6 +183,7 @@ export default {
         StudipButton,
         StudipTooltipIcon,
         MessageBox,
+        MessageList,
         StudipIcon,
         ServerDialog
     },
@@ -171,19 +198,21 @@ export default {
     },
 
     computed: {
-        ...mapGetters(['config', 'drivers'])
+        ...mapGetters(['config', 'drivers', 'general_config'])
     },
 
     methods: {
         storeConfig() {
-            this.$store.dispatch(CONFIG_CREATE, this.config)
+            this.$store.dispatch(CONFIG_CREATE, {'config': this.config, 'general_config': this.general_config})
                 .then(({ data }) => {
                     this.message = data.message;
                     this.$store.commit(CONFIG_SET, data.config);
+
                     if (data.message.type == 'error') {
                        this.$store.dispatch(CONFIG_LIST_READ)
                             .then(() => {
                                 this.changes_made = false;
+                                this.createServerObject();
                             });
                     }
                     this.changes_made = false;
@@ -191,8 +220,7 @@ export default {
         },
 
         deleteServer(driver_name, index) {
-            //this.changes_made = true;
-            this.config[driver_name]['servers'].splice(index, 1);
+            this.$delete(this.config[driver_name]['servers'], index);
         },
 
         clearServer(driver_name) {
@@ -218,7 +246,7 @@ export default {
             let server_object = params.server;
 
             if (!this.config[driver_name]['servers']) {
-                this.config[driver_name]['servers'] = {}
+                this.$set(this.config[driver_name], 'servers', []);
             }
 
             var index = 0;
@@ -283,6 +311,12 @@ export default {
                 this.changes_made = true;
             },
             deep: true
+        },
+        general_config: {
+            handler: function() {
+                this.changes_made = true;
+            },
+            deep: true
         }
     },
 
@@ -290,11 +324,8 @@ export default {
         store.dispatch(CONFIG_LIST_READ)
             .then(() => {
                 this.changes_made = false;
+                this.createServerObject();
             });
-    },
-
-    beforeMount() {
-        this.createServerObject();
     }
 };
 </script>

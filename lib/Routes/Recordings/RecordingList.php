@@ -54,13 +54,13 @@ class RecordingList extends MeetingsController
                         }
                     }
                 }
-                if ($this->getFeatures($meetingCourse->meeting['features'], 'meta_opencast-dc-isPartOf') && 
+                if ($this->getFeatures($meetingCourse->meeting['features'], 'meta_opencast-dc-isPartOf') && !empty(MeetingPlugin::checkOpenCast($meetingCourse->course_id)) &&
                     $this->getFeatures($meetingCourse->meeting['features'], 'meta_opencast-dc-isPartOf') == MeetingPlugin::checkOpenCast($meetingCourse->course_id))
                 {
                     $recordings_list['opencast'] = \PluginEngine::getURL('OpenCast', ['cid' => $cid], 'course', true);
                 }
             } catch (Exception $e) {
-                throw new Error('Fehler in der Aufzeichnungliste (' . $e->getMessage() . ')', 404);
+                throw new Error('Fehler in der Aufzeichnungliste (' . $e->getMessage() . ')', ($e->getCode() ? $e->getCode() : 404));
             }
         }
 

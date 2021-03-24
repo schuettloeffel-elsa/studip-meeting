@@ -69,6 +69,25 @@ class RoomEdit extends MeetingsController
             // apply default features
 
             if (isset($json['features'])) {
+                // Apply validation on features inputs
+                try {
+                    $validated_features = $this->validateFeatureInputs($json['features'], $meeting->driver);
+                    if (!$validated_features) {
+                        $message = [
+                            'text' => I18N::_('Raumeinstellung kann nicht bearbeitet werden!'),
+                            'type' => 'error'
+                        ];
+                        return $this->createResponse([
+                            'message'=> $message,
+                        ], $response);
+                        die();
+                    } else {
+                        $json['features'] = $validated_features;
+                    }
+                } catch (Exception $e) {
+                    throw new Error($e->getMessage(), 404);
+                }
+                
                 if (!is_numeric($json['features']['duration'])) {
                     $json['features']['duration'] = "240";
                 }
@@ -83,7 +102,7 @@ class RoomEdit extends MeetingsController
                             $series_id = MeetingPlugin::checkOpenCast($json['cid']);
                             if ($series_id) {
                                 $opencast_series_id = $series_id;
-                            } else {
+                            } else if ($series_id === false) {
                                 $message = [
                                     'text' => I18N::_('Opencast Series id kann nicht gefunden werden!'),
                                     'type' => 'error'
@@ -91,6 +110,8 @@ class RoomEdit extends MeetingsController
                                 return $this->createResponse([
                                     'message'=> $message,
                                 ], $response);
+                            } else if ($series_id === '') {
+                                //TODO: handel if the opencast is not activated!
                             }
                         }
                     }

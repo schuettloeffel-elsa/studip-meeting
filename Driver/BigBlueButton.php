@@ -8,6 +8,8 @@ use ElanEv\Model\Meeting;
 use ElanEv\Model\MeetingToken;
 use ElanEv\Model\Driver;
 use Throwable;
+use GuzzleHttp\Exception\BadResponseException;
+use Meetings\Errors\Error;
 
 /**
  * Big Blue Button driver implementation.
@@ -37,6 +39,8 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
 
         $this->salt = $config['api-key'];
         $this->url  = $config['url'];
+        $this->connection_timeout = $config['connection_timeout'];
+        $this->request_timeout =  $config['request_timeout'];
     }
 
     /**
@@ -70,8 +74,21 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
                 $params['name'] = $params['name'] . ' (' . date('Y-m-d H:i:s') . ')';
             }
 
+            if (!isset($features['welcome'])) {
+                $features['welcome'] = Driver::getConfigValueByDriver((new \ReflectionClass(self::class))->getShortName(), 'welcome');
+            }
+
             $params = array_merge($params, $features);
         }
+
+        //additional information using meta_
+        if ($manifest = MeetingPlugin::getMeetingManifestInfo()) {
+            !isset($manifest["pluginname"]) ?: $params['meta_bbb-origin'] = 'Stud.IP - ' . $manifest["pluginname"] .
+                                                (strpos(strtolower($manifest["pluginname"]), 'plugin') !== FALSE ?: ' Plugin');
+            !isset($manifest['version']) ?: $params['meta_bbb-origin-version'] = $manifest['version'];
+        }
+        !$GLOBALS['ABSOLUTE_URI_STUDIP'] ?: $params['meta_bbb-origin-server-name'] = $GLOBALS['ABSOLUTE_URI_STUDIP'];
+
 
         $options = $this->prepareSlides($parameters->getMeetingId());
         $response = $this->performRequest('create', $params, $options);
@@ -239,7 +256,32 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
     {
         $params['checksum'] = $this->createSignature($endpoint, $params);
         $uri = 'api/'.$endpoint.'?'.$this->buildQueryString($params);
-        $request = $this->client->request('GET', $this->url .'/'. $uri, $options);
+
+        if (preg_match("/^[\d\.]+$/", $this->connection_timeout)) {
+            $options['connect_timeout'] = floatval($this->connection_timeout);
+        }
+
+        if (preg_match("/^[\d\.]+$/", $this->request_timeout)) {
+            $options['timeout'] = floatval($this->request_timeout);
+        }
+
+        try {
+            $method = (is_array($options) && count($options)) ? 'POST' : 'GET';
+            $request = $this->client->request($method, $this->url .'/'. $uri, $options);
+            return $request->getBody(true);
+        } catch (BadResponseException $e) {
+            $response = $e->getResponse()->getBody(true);
+            $xml = new \SimpleXMLElement($response);
+            $status_code = 500;
+            $error = _('Internal Error');
+            $message = _('Please contact a system administrator!');
+            if ($xml instanceof \SimpleXMLElement) {
+                $message = (string) $xml->message ? (string) $xml->message : $message;
+                $error = (string) $xml->error ? (string) $xml->error : $error;
+                $status_code = (string) $xml->status ? (string) $xml->status : $status_code;
+            }
+            throw new Error(_($error) . ': ' . _($message), $status_code);
+        }
 
         return $request->getBody(true);
     }
@@ -262,19 +304,21 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
     /**
      * {@inheritDoc}
      */
-    public function getConfigOptions()
+    public static function getConfigOptions()
     {
         return array(
             new ConfigOption('url',     dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'URL des BBB-Servers')),
             new ConfigOption('api-key', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Api-Key (Salt)')),
             new ConfigOption('proxy', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Zugriff über Proxy')),
+            new ConfigOption('connection_timeout', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Connection Timeout (e.g. 0.5)')),
+            new ConfigOption('request_timeout', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Request Timeout (e.g. 3.4)')),
             new ConfigOption('maxParticipants', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Maximale Teilnehmer')),
             new ConfigOption('roomsize-presets', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Raumgrößenvoreinstellungen'), self::getRoomSizePresets()
             ),
         );
     }
 
-    private function getRoomSizePresets() {
+    private static function getRoomSizePresets() {
         return array(
             new ConfigOption('small', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Kleiner Raum'), self::getRoomSizeFeature(0)),
             new ConfigOption('medium', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Mittlerer Raum'), self::getRoomSizeFeature(50)),
@@ -282,7 +326,7 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
         );
     }
 
-    private function getRoomSizeFeature($minParticipants = 0) {
+    private static function getRoomSizeFeature($minParticipants = 0) {
         $roomsize_features = array_filter(self::getCreateFeatures(), function ($configOption) {
             return in_array($configOption->getName(),
                             [
@@ -300,8 +344,12 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
     /**
      * {@inheritDoc}
      */
-    public function getCreateFeatures()
+    public static function getCreateFeatures()
     {
+        $res['welcome'] = new ConfigOption('welcome', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Willkommensnachricht'),
+                    Driver::getConfigValueByDriver((new \ReflectionClass(self::class))->getShortName(), 'welcome'),
+                    self::getFeatureInfo('welcome'));
+        
         $res['guestPolicy'] =
             new ConfigOption('guestPolicy', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Zugang via Link'),
                  ['ALWAYS_DENY' => _('Nicht gestattet'), 'ASK_MODERATOR' => _('Moderator vor dem Zutritt fragen'), 'ALWAYS_ACCEPT' => _('Gestattet'), ],
@@ -325,7 +373,7 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
         $res['lockSettingsDisableCam'] = new ConfigOption('lockSettingsDisableCam', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Nur Moderatoren können Webcams teilen'), false, self::getFeatureInfo('lockSettingsDisableCam'));
 
         $res['webcamsOnlyForModerator'] = new ConfigOption('webcamsOnlyForModerator', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Nur Moderatoren können Webcams sehen'), false, self::getFeatureInfo('webcamsOnlyForModerator'));
-
+        $res['room_anyone_can_start'] = new ConfigOption('room_anyone_can_start', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Jeder Teilnehmer kann die Konferenz starten'), true, self::getFeatureInfo('room_anyone_can_start'));
         $res['muteOnStart'] = new ConfigOption('muteOnStart', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Alle Teilnehmenden initial stumm schalten'), false, self::getFeatureInfo('muteOnStart'));
 
         return array_reverse($res);
@@ -334,7 +382,7 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
     /**
      * {@inheritDoc}
      */
-    public function getRecordFeature()
+    public static function getRecordFeature()
     {
         $res = [];
         if (Driver::getConfigValueByDriver((new \ReflectionClass(self::class))->getShortName(), 'record')) { // dependet on config record
@@ -351,7 +399,7 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
     /**
      * {@inheritDoc}
      */
-    public function useOpenCastForRecording()
+    public static function useOpenCastForRecording()
     {
         $res = false;
         !MeetingPlugin::checkOpenCast() ?: $res = new ConfigOption('opencast', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Opencast für Aufzeichnungen verwenden'), false);
@@ -383,6 +431,13 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
             case 'muteOnStart':
                 // return _('Alle Benutzer starten die Besprechung stummgeschaltet, können ihre Stummschaltung aber jederzeit aufheben.');
                 // break;
+            case 'room_anyone_can_start':
+                // return _('Jeder Teilnehmer kann die Konferenz starten.');
+                // break;
+            case 'welcome':
+                return _('Wenn leer, wird die Standardnachricht angezeigt. Sie können folgende Schlüsselwörter einfügen, die automatisch ersetzt werden:
+                %% CONFNAME %% (Sitzungsname), %% DIALNUM %% (Sitzungswahlnummer)');
+                break;
             default:
                 return '';
                 break;
@@ -414,7 +469,11 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
     public function prepareSlides($meetingId)
     {
         $options = [];
-
+        
+        if (Driver::getConfigValueByDriver((new \ReflectionClass(self::class))->getShortName(), 'preupload') == false) {
+            return $options;
+        }
+        
         $meeting = new Meeting($meetingId);
 
         if ($meeting->isNew() || empty($meeting->folder_id)) {
@@ -423,7 +482,6 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
 
         $documents = [];
         $folder = \Folder::find($meeting->folder_id);
-
         //generate or get the token
         $token = ($meeting->meeting_token) ? $meeting->meeting_token->get_token() : null;
         if (!$token) {
