@@ -29,6 +29,16 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
      */
     private $salt;
 
+    /**
+     * @var string Course Type in which the server of this driver should be used "{$semClassId}_{$semClassTypeId}"
+     */
+    public $course_type;
+
+    /**
+     * @var boolean Indication of server activation
+     */
+    public $active;
+
     public function __construct(ClientInterface $client, array $config)
     {
         $this->client = $client;
@@ -41,6 +51,8 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
         $this->url  = $config['url'];
         $this->connection_timeout = $config['connection_timeout'];
         $this->request_timeout =  $config['request_timeout'];
+        $this->course_type = (isset($config['course_types'])) ? $config['course_types'] : '';
+        $this->active = (isset($config['active'])) ? $config['active'] : true;
     }
 
     /**
@@ -80,6 +92,10 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
 
             if (!isset($features['welcome'])) {
                 $features['welcome'] = Driver::getConfigValueByDriver((new \ReflectionClass(self::class))->getShortName(), 'welcome');
+            }
+
+            if (isset($features['meta_opencast-dc-isPartOf'])) {
+                $features['meta_opencast-dc-title'] = htmlspecialchars($params['name']);
             }
 
             $params = array_merge($params, $features);
@@ -299,7 +315,12 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
     {
         $segments = array();
         foreach ($params as $key => $value) {
-            $segments[] = rawurlencode($key).'='.rawurlencode($value);
+            if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                $encoded_value = $value == true ? 'true' : 'false';
+            } else {
+                $encoded_value = rawurlencode($value);
+            }
+            $segments[] = rawurlencode($key).'='.$encoded_value;
         }
 
         return implode('&', $segments);
@@ -311,14 +332,15 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
     public static function getConfigOptions()
     {
         return array(
+            new ConfigOption('active', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Aktiv?'), true),
             new ConfigOption('url',     dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'URL des BBB-Servers')),
             new ConfigOption('api-key', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Api-Key (Salt)')),
             new ConfigOption('proxy', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Zugriff über Proxy')),
             new ConfigOption('connection_timeout', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Connection Timeout (e.g. 0.5)')),
             new ConfigOption('request_timeout', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Request Timeout (e.g. 3.4)')),
             new ConfigOption('maxParticipants', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Maximale Teilnehmer')),
-            new ConfigOption('roomsize-presets', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Raumgrößenvoreinstellungen'), self::getRoomSizePresets()
-            ),
+            new ConfigOption('course_types', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Veranstaltungstyp'), MeetingPlugin::getSemClasses(), _('Nur in folgenden Veranstaltungskategorien nutzbar')),
+            new ConfigOption('roomsize-presets', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Raumgrößenvoreinstellungen'), self::getRoomSizePresets()),
         );
     }
 
