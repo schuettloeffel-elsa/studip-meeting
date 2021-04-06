@@ -1,9 +1,11 @@
+/package.json
+/package-lock.json
+/composer.json
 /composer.lock
-/vendor
+/phpunit.xml.dist
+/translate.sh
+/webpack.config.js
+/vueapp
 node_modules
-static
 .vscode
 .DS_Store
-app/views/index/index.php
-app/views/admin/index.php
-app/views/room/lobby.php
