@@ -37,8 +37,36 @@
                                     Bitte wählen Sie ein Konferenzsystem aus
                                 </option>
                                 <option v-for="(driver_config, driver) in availableServers" :key="driver"
-                                        :value="driver">
+                                        :value="driver"
+                                        :disabled="Object.keys(config[driver]['servers']).length == 1 
+                                                    && ((config[driver]['server_course_type']
+                                                    && config[driver]['server_course_type'][0] &&
+                                                    !config[driver]['server_course_type'][0]['valid']) || !config[driver]['servers'][0])">
                                         {{ driver_config['display_name'] }}
+                                        <template v-if="Object.keys(config[driver]['servers']).length == 1">
+                                            <span v-if="config[driver]['server_details'] && config[driver]['server_details'][0]
+                                                && config[driver]['server_details'][0]['label'] && config[driver]['server_details'][0]['label'] != ''"
+                                                v-translate="{
+                                                    label: config[driver]['server_details'][0]['label']
+                                                }"    
+                                            >
+                                                (%{ label })
+                                            </span>
+                                            <span v-if="config[driver]['server_course_type'] && config[driver]['server_course_type'][0] &&
+                                                    config[driver]['server_course_type'][0]['name']"
+                                                v-translate="{
+                                                    name: config[driver]['server_course_type'][0]['name']
+                                                }"
+                                            >
+                                                (für %{ name })
+                                            </span>
+                                            <span v-translate
+                                                v-if="!config[driver]['servers'][0] || (config[driver]['server_course_type'] && config[driver]['server_course_type'][0] &&
+                                                        !config[driver]['server_course_type'][0]['valid'])"
+                                            >
+                                            - nicht verfügbar
+                                            </span>
+                                        </template>
                                 </option>
                             </select>
                         </label>
@@ -56,8 +84,20 @@
                                     Bitte wählen Sie einen Server aus
                                 </option>
                                 <option v-for="(server_config, server_index) in config[room['driver']]['servers']" :key="server_index"
-                                        :value="'' + server_index">
-                                        <translate>Server {{ (server_index + 1) }}</translate>
+                                        :value="'' + server_index" 
+                                        :disabled="!server_config || (config[room['driver']]['server_course_type'] && config[room['driver']]['server_course_type'][server_index] &&
+                                                    !config[room['driver']]['server_course_type'][server_index]['valid'])"
+                                        >
+                                        <span v-if="config[room['driver']]['server_details'] && config[room['driver']]['server_details'][server_index]
+                                            && config[room['driver']]['server_details'][server_index]['label']
+                                            && config[room['driver']]['server_details'][server_index]['label'] != ''"
+                                            v-translate="{
+                                                label: config[room['driver']]['server_details'][server_index]['label']
+                                            }"
+                                        >
+                                            %{ label }
+                                        </span>
+                                        <translate v-else>Server {{ (server_index + 1) }}</translate>
                                         <span v-if="config[room['driver']]['server_defaults'] && config[room['driver']]['server_defaults'][server_index]
                                                     &&  config[room['driver']]['server_defaults'][server_index]['maxAllowedParticipants']"
                                             v-translate="{
@@ -66,8 +106,34 @@
                                         >
                                             (max. %{ count } Teilnehmer)
                                         </span>
+                                        <span v-if="config[room['driver']]['server_course_type'] && config[room['driver']]['server_course_type'][server_index] &&
+                                                    config[room['driver']]['server_course_type'][server_index]['name']"
+                                            v-translate="{
+                                                name: config[room['driver']]['server_course_type'][server_index]['name']
+                                            }"
+                                        >
+                                            (für %{ name })
+                                        </span>
+                                        <span v-translate
+                                            v-if="!server_config || (config[room['driver']]['server_course_type'] && config[room['driver']]['server_course_type'][server_index] &&
+                                                    !config[room['driver']]['server_course_type'][server_index]['valid'])"
+                                        >
+                                           - nicht verfügbar
+                                        </span>
                                 </option>
                             </select>
+                        </label>
+                        <label v-if="room['driver'] && room['server_index'] && config[room['driver']]['server_details']
+                                && config[room['driver']]['server_details'][room['server_index']]
+                                && config[room['driver']]['server_details'][room['server_index']]['description']
+                                && config[room['driver']]['server_details'][room['server_index']]['description'] != ''"
+                        >
+                            <strong v-translate>
+                                Serverbeschreibung
+                            </strong>
+                            <div v-translate style="word-break: break-word !important;"
+                                v-text="config[room['driver']]['server_details'][room['server_index']]['description']"
+                            ></div>
                         </label>
                     </fieldset>
 
@@ -125,6 +191,13 @@
                                     >
                                         &nbsp; (Max. Limit: %{ count })
                                     </span>
+                                    <span v-if="feature['name'] == 'duration' && maxDuration" 
+                                        v-translate="{
+                                            maxDuration
+                                        }"
+                                    >
+                                         &nbsp; (Max. Limit: %{ maxDuration } Minuten)
+                                    </span>
                                     <StudipTooltipIcon v-if="Object.keys(feature).includes('info')"
                                         :text="feature['info']">
                                     </StudipTooltipIcon>
@@ -138,7 +211,7 @@
                                                 && Object.keys(config[room['driver']]['server_defaults'][room['server_index']]).includes('maxAllowedParticipants')) ?
                                                     config[room['driver']]['server_defaults'][room['server_index']]['maxAllowedParticipants']
                                                 : ''
-                                            : ''
+                                            :  (feature['name'] == 'duration') ? maxDuration : ''
                                         )"
                                         :min="(feature['name'] == 'maxParticipants') ? minParticipants : ((feature['name'] == 'duration') ? 1 : '')"
                                         @change="(feature['name'] == 'maxParticipants') ? checkPresets() : ''"
@@ -194,7 +267,7 @@
                         </div>
                     </fieldset>
 
-                    <fieldset v-if="(Object.keys(course_groups).length > 1)">
+                    <fieldset v-if="room['driver'] && Object.keys(course_groups).length">
                         <legend v-translate>
                             Gruppenraum
                         </legend>
@@ -419,7 +492,8 @@ export default {
             showAddNewFolder: false,
             showFilesInFolder: false,
             numFileInFolderLimit: 5,
-            minParticipants: 20
+            minParticipants: 20,
+            maxDuration: 1440
         }
     },
 
@@ -433,7 +507,7 @@ export default {
             let availableServers = {};
 
             for (let server in this.config) {
-                if (this.config[server].enable !== 0) {
+                if (this.config[server].enable) {
                     availableServers[server] = this.config[server];
                 }
             }
@@ -468,6 +542,18 @@ export default {
             //mandatory server selection when there is only one server
             if (this.room['driver'] && Object.keys(this.config[this.room['driver']]['servers']).length == 1) {
                 this.$set(this.room, "server_index" , "0");
+            }
+
+            // auto-selecting server if there is only one avaialble for this course!
+            if (this.room['driver'] && Object.keys(this.config[this.room['driver']]).includes('server_course_type')
+                && Object.keys(this.config[this.room['driver']]['server_course_type']).length > 1) {
+                const server_course_types_validataion = this.config[this.room['driver']]['server_course_type'].map((sct) => sct.valid == true);
+                if (server_course_types_validataion.filter(Boolean).length == 1) {
+                    var server_index = server_course_types_validataion.findIndex((sct) => sct == true);
+                    if (server_index != -1) {
+                        this.$set(this.room, "server_index" , server_index.toString());
+                    }
+                }
             }
 
             //set default features
@@ -633,6 +719,29 @@ export default {
             return isValid;
         },
 
+        validateMinMaxDuration() {
+            var isValid = true;
+            this.$set(this.modal_message, "text" , "");
+            var err_message = '';
+
+            if (this.maxDuration && this.room['driver'] && this.room['server_index'] && this.room['features'] && this.room['features']['duration']) {
+                if (this.room['features']['duration'] > this.maxDuration) {
+                    err_message = `Konferenzdauer darf ${this.maxDuration} Minuten nicht überschreiten`.toLocaleString();
+                    isValid = false;
+                    this.$set(this.room['features'], 'duration', this.maxDuration);
+                }
+            }
+
+            if (!isValid) {
+                this.modal_message.type = 'error';
+                setTimeout(() => {
+                    this.modal_message.text = err_message;
+                }, 150);
+            }
+            
+            return isValid;
+        },
+
         addRoom(event) {
             if (event) {
                 event.preventDefault();
@@ -643,6 +752,10 @@ export default {
             }
 
             if (!this.validateMinMaxParticipants()) {
+                return;
+            }
+
+            if (!this.validateMinMaxDuration()) {
                 return;
             }
 
@@ -703,6 +816,10 @@ export default {
             }
 
             if (!this.validateMinMaxParticipants()) {
+                return;
+            }
+
+            if (!this.validateMinMaxDuration()) {
                 return;
             }
 

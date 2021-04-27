@@ -89,7 +89,7 @@
                     </span>
                 </div>
 
-                <div v-if="room.folder_id !== null && room.details && room.details.folder">
+                <div v-if="course_config.display.editRoom && room.folder_id !== null && room.details && room.details.folder">
                     <StudipIcon class="info-icon" icon="folder-empty"
                             role="inactive" size="24">
                     </StudipIcon>
@@ -125,7 +125,7 @@
                 </div>
             </label>
             <div class="meeting-item-btns">
-                <StudipButton v-if="course_config.display.editRoom && room.features && room.features.guestPolicy && room.features.guestPolicy != 'ALWAYS_DENY'"
+                <StudipButton v-if="course_config.display.editRoom && room.features && room.features['guestPolicy-ALWAYS_ACCEPT'] && room.features['guestPolicy-ALWAYS_ACCEPT'] == 'true'"
                     type="button" v-on:click="getGuestInfo()"
                     icon="add" v-translate
                 >
@@ -215,12 +215,16 @@ export default {
     },
 
     methods: {
+        getNonReactiveRoom() {
+            return JSON.parse(JSON.stringify(this.room));
+        },
+
         writeFeedback() {
-            this.$emit('getFeedback', this.room);
+            this.$emit('getFeedback', this.getNonReactiveRoom());
         },
 
         editFeatures() {
-            this.$emit('getFeatures', this.room);
+            this.$emit('getFeatures', this.getNonReactiveRoom());
         },
 
         editRights() {
@@ -256,7 +260,7 @@ export default {
         },
 
         getRecording() {
-            this.$emit('getRecording', this.room);
+            this.$emit('getRecording', this.getNonReactiveRoom());
         },
 
         deleteRoom(event) {
@@ -276,7 +280,7 @@ export default {
         },
 
         getGuestInfo() {
-            this.$emit('getGuestInfo', this.room);
+            this.$emit('getGuestInfo', this.getNonReactiveRoom());
         },
     }
 }
