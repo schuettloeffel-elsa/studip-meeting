@@ -82,7 +82,6 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
                 unset($features['maxParticipants']);
             }
 
-<<<<<<< HEAD
             if (isset($features['guestPolicy-ALWAYS_ACCEPT'])) {
                 if ($features['guestPolicy-ALWAYS_ACCEPT'] == "true") {
                     $features['guestPolicy'] = 'ALWAYS_ACCEPT';
@@ -101,8 +100,6 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
 
             // The logic from BBB seems not to work with ALWAYS_DENY only for guests, in fact, 
             // it denies both guests and participants.
-=======
->>>>>>> 0adbf21 (disable feature maxParticipants per room)
             if ($features['guestPolicy'] == 'ALWAYS_DENY') {
                 unset($features['guestPolicy']);
             }
