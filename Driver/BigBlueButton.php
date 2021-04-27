@@ -29,6 +29,16 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
      */
     private $salt;
 
+    /**
+     * @var string Course Type in which the server of this driver should be used "{$semClassId}_{$semClassTypeId}"
+     */
+    public $course_type;
+
+    /**
+     * @var boolean Indication of server activation
+     */
+    public $active;
+
     public function __construct(ClientInterface $client, array $config)
     {
         $this->client = $client;
@@ -41,6 +51,8 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
         $this->url  = $config['url'];
         $this->connection_timeout = $config['connection_timeout'];
         $this->request_timeout =  $config['request_timeout'];
+        $this->course_type = (isset($config['course_types'])) ? $config['course_types'] : '';
+        $this->active = (isset($config['active'])) ? $config['active'] : true;
     }
 
     /**
@@ -70,6 +82,27 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
                 unset($features['maxParticipants']);
             }
 
+<<<<<<< HEAD
+            if (isset($features['guestPolicy-ALWAYS_ACCEPT'])) {
+                if ($features['guestPolicy-ALWAYS_ACCEPT'] == "true") {
+                    $features['guestPolicy'] = 'ALWAYS_ACCEPT';
+                } else {
+                    $features['guestPolicy'] = 'ALWAYS_DENY';
+                }
+                unset($features['guestPolicy-ALWAYS_ACCEPT']);
+            }
+
+            if (isset($features['guestPolicy-ASK_MODERATOR'])) {
+                if ($features['guestPolicy-ASK_MODERATOR'] == "true") {
+                    $features['guestPolicy'] = 'ASK_MODERATOR';
+                }
+                unset($features['guestPolicy-ASK_MODERATOR']);
+            }
+
+            // The logic from BBB seems not to work with ALWAYS_DENY only for guests, in fact, 
+            // it denies both guests and participants.
+=======
+>>>>>>> 0adbf21 (disable feature maxParticipants per room)
             if ($features['guestPolicy'] == 'ALWAYS_DENY') {
                 unset($features['guestPolicy']);
             }
@@ -80,6 +113,10 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
 
             if (!isset($features['welcome'])) {
                 $features['welcome'] = Driver::getConfigValueByDriver((new \ReflectionClass(self::class))->getShortName(), 'welcome');
+            }
+
+            if (isset($features['meta_opencast-dc-isPartOf'])) {
+                $features['meta_opencast-dc-title'] = htmlspecialchars($params['name']);
             }
 
             $params = array_merge($params, $features);
@@ -299,7 +336,12 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
     {
         $segments = array();
         foreach ($params as $key => $value) {
-            $segments[] = rawurlencode($key).'='.rawurlencode($value);
+            if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                $encoded_value = $value == true ? 'true' : 'false';
+            } else {
+                $encoded_value = rawurlencode($value);
+            }
+            $segments[] = rawurlencode($key).'='.$encoded_value;
         }
 
         return implode('&', $segments);
@@ -311,14 +353,17 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
     public static function getConfigOptions()
     {
         return array(
+            new ConfigOption('active', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Aktiv?'), true),
+            new ConfigOption('label', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Label'), 'Server #'),
             new ConfigOption('url',     dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'URL des BBB-Servers')),
             new ConfigOption('api-key', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Api-Key (Salt)')),
             new ConfigOption('proxy', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Zugriff über Proxy')),
             new ConfigOption('connection_timeout', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Connection Timeout (e.g. 0.5)')),
             new ConfigOption('request_timeout', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Request Timeout (e.g. 3.4)')),
             new ConfigOption('maxParticipants', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Maximale Teilnehmer')),
-            new ConfigOption('roomsize-presets', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Raumgrößenvoreinstellungen'), self::getRoomSizePresets()
-            ),
+            new ConfigOption('course_types', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Veranstaltungstyp'), MeetingPlugin::getSemClasses(), _('Nur in folgenden Veranstaltungskategorien nutzbar')),
+            new ConfigOption('description', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Beschreibung'), '', _('Ein Beschreibungstext wird angezeigt, um den Server zu führen oder zu beschreiben.')),
+            new ConfigOption('roomsize-presets', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Raumgrößenvoreinstellungen'), self::getRoomSizePresets()),
         );
     }
 
@@ -353,11 +398,6 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
         $res['welcome'] = new ConfigOption('welcome', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Willkommensnachricht'),
                     Driver::getConfigValueByDriver((new \ReflectionClass(self::class))->getShortName(), 'welcome'),
                     self::getFeatureInfo('welcome'));
-        
-        $res['guestPolicy'] =
-            new ConfigOption('guestPolicy', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Zugang via Link'),
-                 ['ALWAYS_DENY' => _('Nicht gestattet'), 'ASK_MODERATOR' => _('Moderator vor dem Zutritt fragen'), 'ALWAYS_ACCEPT' => _('Gestattet'), ],
-                 _('Legen Sie fest, ob Benutzer mit Einladungslink als Gäste an der Besprechung teilnehmen dürfen und ob Gäste dem Meeting direkt beitreten können oder ihre Teilnahme von einem Moderator bestätigt werden muss.'));
 
         $res['duration'] = new ConfigOption('duration', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Minuten Konferenzdauer'),
                     240,
@@ -365,6 +405,11 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
 
         //$res['maxParticipants'] = new ConfigOption('maxParticipants', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Maximale Teilnehmerzahl'), 50, self::getFeatureInfo('maxParticipants'));
 
+        $res['guestPolicy-ALWAYS_ACCEPT'] = new ConfigOption('guestPolicy-ALWAYS_ACCEPT', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Zugang via Link'), false,
+                 _('Legen Sie fest, ob Benutzer mit Einladungslink als Gäste an der Besprechung teilnehmen dürfen.'));
+
+        $res['guestPolicy-ASK_MODERATOR'] = new ConfigOption('guestPolicy-ASK_MODERATOR', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Moderatoren vor Teilnehmendenzutritt fragen'), false,
+                 _('Legen Sie fest, ob Gäste und Teilnehmer dem Meeting direkt beitreten können oder ihre Teilnahme von einem Moderator bestätigt werden muss.'));
 
         $res['privateChat'] = new ConfigOption('lockSettingsDisablePrivateChat', dgettext(MeetingPlugin::GETTEXT_DOMAIN, 'Private Chats deaktivieren'),
                     false, null);
@@ -420,6 +465,10 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
             case 'webcamsOnlyForModerator':
                 return _('Bei Aktivierung dieser Option können ausschließlich Moderatoren die von Teilnehmenden freigegebenen Webcams sehen.');
             break;
+            case 'welcome':
+                return _('Wenn leer, wird die Standardnachricht angezeigt. Sie können folgende Schlüsselwörter einfügen, die automatisch ersetzt werden:
+                %% CONFNAME %% (Sitzungsname), %% DIALNUM %% (Sitzungswahlnummer)');
+            break;
             case 'maxParticipants':
                 // return _('Die maximale Anzahl von Benutzern, die gleichzeitig an der Konferenz teilnehmen dürfen.');
                 // break;
@@ -438,10 +487,6 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
             case 'room_anyone_can_start':
                 // return _('Jeder Teilnehmer kann die Konferenz starten.');
                 // break;
-            case 'welcome':
-                return _('Wenn leer, wird die Standardnachricht angezeigt. Sie können folgende Schlüsselwörter einfügen, die automatisch ersetzt werden:
-                %% CONFNAME %% (Sitzungsname), %% DIALNUM %% (Sitzungswahlnummer)');
-                break;
             default:
                 return '';
                 break;
@@ -497,18 +542,20 @@ class BigBlueButton implements DriverInterface, RecordingInterface, FolderManage
             $meeting_token->store();
         }
 
-        foreach ($folder->getTypedFolder()->getFiles() as $file_ref) {
-            if ($file_ref->id && $file_ref->name) {
-                $document_url = \PluginEngine::getURL('meetingplugin', [], "api/slides/$meetingId/{$file_ref->id}/$token");
-                if (isset($_SERVER['SERVER_NAME']) && strpos($document_url, $_SERVER['SERVER_NAME']) === FALSE) {
-                    $base_url = sprintf(
-                        "%s://%s",
-                        isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off' ? 'https' : 'http',
-                        $_SERVER['SERVER_NAME']
-                    );
-                    $document_url = $base_url . $document_url;
+        if ($folder) {
+            foreach ($folder->getTypedFolder()->getFiles() as $file_ref) {
+                if ($file_ref->id && $file_ref->name) {
+                    $document_url = \PluginEngine::getURL('meetingplugin', [], "api/slides/$meetingId/{$file_ref->id}/$token");
+                    if (isset($_SERVER['SERVER_NAME']) && strpos($document_url, $_SERVER['SERVER_NAME']) === FALSE) {
+                        $base_url = sprintf(
+                            "%s://%s",
+                            isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off' ? 'https' : 'http',
+                            $_SERVER['SERVER_NAME']
+                        );
+                        $document_url = $base_url . $document_url;
+                    }
+                    $documents[] = "<document url='$document_url' filename='{$file_ref->name}' />";
                 }
-                $documents[] = "<document url='$document_url' filename='{$file_ref->name}' />";
             }
         }
         if (count($documents)) {

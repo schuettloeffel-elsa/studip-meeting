@@ -68,6 +68,18 @@ class RoomsList extends MeetingsController
                     $meetingEnabled = false;
                 }
 
+                // Checking Course Type
+                if (!MeetingPlugin::checkCourseType($meetingCourse->course, $driver->course_type)) {
+                    if (!$perm->have_studip_perm('tutor', $cid)) {
+                        continue;
+                    } else {
+                        $meetingEnabled = false;
+                    }
+                }
+
+                // Checking folder existence
+                $this->checkAssignedFolder($meetingCourse->meeting);
+
                 $meeting = $meetingCourse->meeting->toArray();
                 $meeting = array_merge($meetingCourse->toArray(), $meeting);
                 $meeting['has_recordings'] = false;
@@ -80,7 +92,8 @@ class RoomsList extends MeetingsController
                                 'giveAccessToRecordings'
                             ), FILTER_VALIDATE_BOOLEAN))
                     ) {
-                        if ((count($driver->getRecordings($meetingCourse->meeting->getMeetingParameters())) > 0)
+                        $recordings = $driver->getRecordings($meetingCourse->meeting->getMeetingParameters());
+                        if (!empty($recordings)
                             || ($this->getFeatures($meeting['features'], 'meta_opencast-dc-isPartOf') && !empty(MeetingPlugin::checkOpenCast($meetingCourse->course_id)) &&
                             $this->getFeatures($meeting['features'], 'meta_opencast-dc-isPartOf') == MeetingPlugin::checkOpenCast($meetingCourse->course_id)))
                         {
@@ -93,7 +106,7 @@ class RoomsList extends MeetingsController
                 $meeting['name']= ltrim($meetingCourse->meeting->name);
 
                 $meeting['details'] = [
-                    'creator' => $create ? $creator->getFullname() : 'unbekannt',
+                    'creator' => $creator ? $creator->getFullname() : 'unbekannt',
                     'date'    => date('d.m.Y H:i', $meetingCourse->meeting->mkdate)
                 ];
 
