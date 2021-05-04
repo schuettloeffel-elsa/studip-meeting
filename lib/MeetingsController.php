@@ -5,6 +5,9 @@ namespace Meetings;
 use Psr\Container\ContainerInterface;
 use Meetings\Errors\Error;
 use ElanEv\Model\Meeting;
+use ElanEv\Model\MeetingCourse;
+use ElanEv\Model\Driver;
+use MeetingPlugin;
 use Throwable;
 
 class MeetingsController
@@ -98,5 +101,83 @@ class MeetingsController
                 throw new Error(_('Unable to check Assigned Folder'), 404);
             }
         }
+    }
+
+    /**
+     * Check recording capabilities based on config and course features
+     * 
+     * @param string $driver the driver name
+     * @param string $cid the course id
+     * 
+     * @return array
+     */
+    public function checkRecordingCapability($driver, $cid) {
+        $allow_recording = false;
+        $message = 'Sitzungsaufzeichnung ist nicht erlaubt.';
+        $type = '';
+        $seriesid = '';
+        $record_config = filter_var(Driver::getConfigValueByDriver($driver, 'record'), FILTER_VALIDATE_BOOLEAN);
+        $opencast_config = filter_var(Driver::getConfigValueByDriver($driver, 'opencast'), FILTER_VALIDATE_BOOLEAN);
+        if ($opencast_config) {
+            $type = 'opencast';
+            $message = 'Opencast Series id kann nicht gefunden werden, Aufzeichnung ist nicht möglich!';
+            if (!empty($cid)) {
+                $series_id = MeetingPlugin::checkOpenCast($cid);
+                if (!empty($series_id)) {
+                    $allow_recording = true;
+                    $seriesid = $series_id;
+                    $message = '';
+                }
+            }
+        } else if ($record_config) {
+            $type = 'bbb';
+            $allow_recording = true;
+            $message = '';
+        }
+        return [
+            "allow_recording" => $allow_recording,
+            "message" => $message,
+            "type" => $type,
+            "seriesid" => $seriesid
+        ];
+    }
+
+    /**
+     * Checks if a group assigned to a meeting still exists, otherwise remove the group_id
+     * from the MeetingCourse model
+     * 
+     * @param MeetingCourse $meetingCourse the meeting course object
+     */
+    public function checkAssignedGroup(MeetingCourse $meetingCourse) {
+        if ($meetingCourse->group_id) {
+            try {
+                $group = \Statusgruppen::find($meetingCourse->group_id);
+                if (!$group) {
+                    $meetingCourse->group_id = null;
+                    $meetingCourse->store();
+                }
+            } catch (Throwable $e) {
+                throw new Error(_('Unable to check Assigned Group'), 404);
+            }
+        }
+        return $meetingCourse;
+    }
+
+    /**
+     * This method check the permission (global and if he is in the group) for a given user
+     *
+     * @param $group_id The Group-ID
+     * @param $cid The Course-ID
+     * @return bool True if user have permission, False otherwise
+     */
+    public function checkGroupPermission($group_id, $cid)
+    {
+        global $perm, $user;
+        $group = new \Statusgruppen($group_id);
+
+        return $group->isMember($user->id)
+            || ($user && is_object($perm)
+                && $perm->have_studip_perm('tutor', $cid, $user->id)
+            );
     }
 }
