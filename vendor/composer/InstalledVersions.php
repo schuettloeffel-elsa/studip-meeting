@@ -18,6 +18,8 @@ use Composer\Semver\VersionParser;
 /**
  * This class is copied in every Composer installed project and available to all
  *
+ * See also https://getcomposer.org/doc/07-runtime.md#installed-versions
+ *
  * To require it's presence, you can require `composer-runtime-api ^2.0`
  */
 class InstalledVersions
@@ -30,7 +32,7 @@ class InstalledVersions
     'aliases' => 
     array (
     ),
-    'reference' => '4d9c94c2cb8bb108a0295d3f821710ade317f9ba',
+    'reference' => 'eb96761f8bd763c77501359693f4a2d1c7bba8c5',
     'name' => 'elanev/meeting-plugin',
   ),
   'versions' => 
@@ -42,7 +44,7 @@ class InstalledVersions
       'aliases' => 
       array (
       ),
-      'reference' => '4d9c94c2cb8bb108a0295d3f821710ade317f9ba',
+      'reference' => 'eb96761f8bd763c77501359693f4a2d1c7bba8c5',
     ),
     'guzzlehttp/guzzle' => 
     array (
@@ -176,7 +178,6 @@ class InstalledVersions
         foreach (self::getInstalled() as $installed) {
             $packages[] = array_keys($installed['versions']);
         }
-
 
         if (1 === \count($packages)) {
             return $packages[0];
@@ -339,7 +340,7 @@ class InstalledVersions
      * Returns the raw installed.php data for custom implementations
      *
      * @return array[]
-     * @psalm-return array{root: array{name: string, version: string, reference: string, pretty_version: string, aliases: string[]}, versions: list<string, array{pretty_version: ?string, version: ?string, aliases: ?string[], reference: ?string, replaced: ?string[], provided: ?string[]}>}
+     * @psalm-return array{root: array{name: string, version: string, reference: string, pretty_version: string, aliases: string[]}, versions: array<string, array{pretty_version?: string, version?: string, aliases?: string[], reference?: string, replaced?: string[], provided?: string[]}>}
      */
     public static function getRawData()
     {
@@ -362,7 +363,7 @@ class InstalledVersions
      * @param  array[] $data A vendor/composer/installed.php data set
      * @return void
      *
-     * @psalm-param array{root: array{name: string, version: string, reference: string, pretty_version: string, aliases: string[]}, versions: list<string, array{pretty_version: ?string, version: ?string, aliases: ?string[], reference: ?string, replaced: ?string[], provided: ?string[]}>} $data
+     * @psalm-param array{root: array{name: string, version: string, reference: string, pretty_version: string, aliases: string[]}, versions: array<string, array{pretty_version?: string, version?: string, aliases?: string[], reference?: string, replaced?: string[], provided?: string[]}>} $data
      */
     public static function reload($data)
     {
@@ -372,6 +373,7 @@ class InstalledVersions
 
     /**
      * @return array[]
+     * @psalm-return list<array{root: array{name: string, version: string, reference: string, pretty_version: string, aliases: string[]}, versions: array<string, array{pretty_version?: string, version?: string, aliases?: string[], reference?: string, replaced?: string[], provided?: string[]}>}>
      */
     private static function getInstalled()
     {

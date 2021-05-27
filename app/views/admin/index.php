@@ -8,5 +8,5 @@
 </script>
 
 
-<? PageLayout::addScript($this->plugin->getPluginUrl() . '/static/main.9681e65b8a75d1433ed6.js'); ?>
+<? PageLayout::addScript($this->plugin->getPluginUrl() . '/static/main.05dcfdc5adaeb052d0d9.js'); ?>
 

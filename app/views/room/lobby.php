@@ -9,5 +9,5 @@
 </script>
 
 
-<? PageLayout::addScript($this->plugin->getPluginUrl() . '/static/main.0284c5617747fe749d05.js'); ?>
+<? PageLayout::addScript($this->plugin->getPluginUrl() . '/static/main.05dcfdc5adaeb052d0d9.js'); ?>
 

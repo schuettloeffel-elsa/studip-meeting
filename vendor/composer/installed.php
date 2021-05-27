@@ -6,7 +6,7 @@
     'aliases' => 
     array (
     ),
-    'reference' => '4d9c94c2cb8bb108a0295d3f821710ade317f9ba',
+    'reference' => 'eb96761f8bd763c77501359693f4a2d1c7bba8c5',
     'name' => 'elanev/meeting-plugin',
   ),
   'versions' => 
@@ -18,7 +18,7 @@
       'aliases' => 
       array (
       ),
-      'reference' => '4d9c94c2cb8bb108a0295d3f821710ade317f9ba',
+      'reference' => 'eb96761f8bd763c77501359693f4a2d1c7bba8c5',
     ),
     'guzzlehttp/guzzle' => 
     array (
